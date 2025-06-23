@@ -1,53 +1,42 @@
-// ===== Tower-Defense script.js =====
 const canvas = document.getElementById('gameCanvas');
-const ctx    = canvas.getContext('2d');
+const ctx = canvas.getContext('2d');
 
-/* ---------- SPRITE PRELOAD ---------- */
+const imageAssets = {};
 const spriteNames = [
-  // Towers
-  'tower_arrow','tower_cannon','tower_ice','tower_lightning','tower_flame',
-  'tower_poison','tower_stun','tower_wind','tower_gold',
-  // Enemies
-  'enemy_goblin','enemy_orc','enemy_bat','enemy_wolf',
-  // Bullets
-  'bullet_default','bullet_fire','bullet_poison','bullet_stun','bullet_lightning'
+  'tower_arrow', 'enemy_goblin'
 ];
 
-const images   = {};          // name → Image()
-let   loaded   = 0;           // how many have finished loading
+let loaded = 0;
 
-spriteNames.forEach(name => {
+spriteNames.forEach((name) => {
   const img = new Image();
-  img.src   = `assets/${name}.png`;
+  img.src = 'assets/' + name + '.png';
   img.onload = () => {
     loaded++;
-    if (loaded === spriteNames.length) startGame();   // ← start only when ALL are ready
+    if (loaded === spriteNames.length) startGame();
   };
-  images[name] = img;
+  img.onerror = () => console.error(`Failed to load: ${img.src}`);
+  imageAssets[name] = img;
 });
 
-/* ---------- VERY SMALL DEMO GAME LOOP ---------- */
-function startGame () {
+function startGame() {
+  drawGame();
+}
 
-  // Demo state (replace with your full tower/enemy logic later)
-  const towers  = [{ x: 120, y: 120, type: 'tower_arrow' }];
-  const enemies = [{ x: 260, y: 240, type: 'enemy_goblin' }];
+function drawGame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  function loop () {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // draw towers
-    for (const t of towers) {
-      ctx.drawImage(images[t.type], t.x - 16, t.y - 16, 32, 32);
-    }
-
-    // draw enemies
-    for (const e of enemies) {
-      ctx.drawImage(images[e.type], e.x - 16, e.y - 16, 32, 32);
-    }
-
-    requestAnimationFrame(loop);
+  const tower = imageAssets['tower_arrow'];
+  if (tower.complete) {
+    ctx.drawImage(tower, 100, 100, 32, 32);
   }
 
-  loop();   // kick things off
+  const enemy = imageAssets['enemy_goblin'];
+  if (enemy.complete) {
+    ctx.drawImage(enemy, 200, 100, 32, 32);
+  }
+
+  requestAnimationFrame(drawGame);
 }
+
+drawGame();

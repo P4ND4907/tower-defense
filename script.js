@@ -1,154 +1,141 @@
-/* ===== Tower-Defense  –  script.js ===== */
 const canvas = document.getElementById('gameCanvas');
-const ctx    = canvas.getContext('2d');
+const ctx = canvas.getContext('2d');
 
-/* ---------- ASSET PRELOAD ---------- */
-const SPRITES = [
-  // towers
-  'tower_arrow', 'tower_cannon', 'tower_lightning', 'tower_flame',
-  'tower_poison', 'tower_stun', 'tower_wind', 'tower_gold',
-  // enemies
-  'enemy_goblin', 'enemy_orc', 'enemy_bat', 'enemy_wolf',
-  // bullets
-  'bullet_default', 'bullet_fire', 'bullet_poison',
-  'bullet_stun', 'bullet_lightning'
-];
-const IMAGES = Object.fromEntries(SPRITES.map(n => [n, new Image()]));
-let loaded = 0;
+canvas.width = 800;
+canvas.height = 600;
 
-SPRITES.forEach(n => {
-  IMAGES[n].src = `assets/${n}.png`;
-  IMAGES[n].onload  = () => (++loaded === SPRITES.length) && startGame();
-  IMAGES[n].onerror = ()  => console.error('Image failed:', n);
-});
-
-/* ---------- GAME STATE ---------- */
-let towers  = [];
-let enemies = [];
-let bullets = [];
-
-const GRID = 40;              // snap size
-const TOWER_RANGE = 140;      // px
-let   money = 200;
-let   wave  = 0;
-
-/* ---------- HELPERS ---------- */
-function rand(a, b) { return Math.random() * (b - a) + a; }
-function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-
-/* ---------- CLASSES ---------- */
 class Enemy {
-  constructor(type, y) {
-    this.type  = type;
-    this.size  = 32;
-    this.x     = -this.size;        // start just off-screen
-    this.y     = y;
-    this.speed = rand(0.5, 1.2);
-    this.maxHp = 5 + wave * 2;
-    this.hp    = this.maxHp;
-  }
-  update() { this.x += this.speed; }
-  draw()   {
-    ctx.drawImage(IMAGES[this.type], this.x, this.y, this.size, this.size);
-    // HP bar
-    ctx.fillStyle = 'red';
-    ctx.fillRect(this.x, this.y - 4, this.size, 3);
-    ctx.fillStyle = 'lime';
-    ctx.fillRect(this.x, this.y - 4, this.size * (this.hp / this.maxHp), 3);
-  }
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = 20;
+        this.color = 'gray';
+        this.speed = 0.5;
+        this.health = 3;
+    }
+
+    update() {
+        this.x += this.speed;
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+    }
 }
 
 class Tower {
-  constructor(x, y, sprite='tower_arrow', bullet='bullet_default') {
-    this.x = x;  this.y = y;
-    this.sprite = sprite;
-    this.bullet = bullet;
-    this.cool   = 0;
-  }
-  update() {
-    if (this.cool > 0) { this.cool--; return; }
-    const target = enemies.find(e => dist(this, e) < TOWER_RANGE);
-    if (target) {
-      bullets.push(new Bullet(this.x + 16, this.y + 16, target, this.bullet));
-      this.cool = 45;                 // fire every 45 frames
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = 20;
+        this.color = 'gold';
+        this.fireRate = 90;
+        this.timer = 0;
     }
-  }
-  draw() { ctx.drawImage(IMAGES[this.sprite], this.x, this.y, 32, 32); }
+
+    update() {
+        this.timer++;
+        if (this.timer >= this.fireRate) {
+            this.timer = 0;
+            const target = enemies.find(enemy => this.inRange(enemy));
+            if (target) {
+                bullets.push(new Bullet(this.x + this.size / 2, this.y + this.size / 2, target));
+            }
+        }
+    }
+
+    inRange(enemy) {
+        const dx = this.x - enemy.x;
+        const dy = this.y - enemy.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < 150;
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x + this.size/2, this.y + this.size/2, this.size/2, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 class Bullet {
-  constructor(x, y, target, sprite) {
-    this.x = x;  this.y = y;
-    this.target = target;
-    this.sprite = sprite;
-    this.speed  = 6;
-    this.radius = 4;
-    this.damage = 2;
-  }
-  update() {
-    if (!enemies.includes(this.target)) return this.expire = true;
-    const d = dist(this, this.target);
-    if (d < this.radius + 16) {            // hit
-      this.target.hp -= this.damage;
-      this.expire = true;
-      return;
+    constructor(x, y, target) {
+        this.x = x;
+        this.y = y;
+        this.radius = 4;
+        this.speed = 2.5;
+        this.target = target;
     }
-    this.x += ((this.target.x - this.x) / d) * this.speed;
-    this.y += ((this.target.y - this.y) / d) * this.speed;
-  }
-  draw() { ctx.drawImage(IMAGES[this.sprite], this.x - 8, this.y - 8, 16, 16); }
+
+    update() {
+        const dx = this.target.x + this.target.size / 2 - this.x;
+        const dy = this.target.y + this.target.size / 2 - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const moveX = (dx / dist) * this.speed;
+        const moveY = (dy / dist) * this.speed;
+
+        this.x += moveX;
+        this.y += moveY;
+
+        // hit detection
+        if (dist < this.radius + this.target.size / 2) {
+            this.target.health -= 1;
+            return true; // mark for removal
+        }
+        return false;
+    }
+
+    draw() {
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
-/* ---------- INPUT (place tower) ---------- */
-canvas.addEventListener('click', e => {
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / GRID) * GRID;
-  const y = Math.floor((e.clientY - rect.top ) / GRID) * GRID;
-  if (money >= 50) {                       // simple cost
-    towers.push(new Tower(x, y));
-    money -= 50;
-  }
+const enemies = [new Enemy(0, 200)];
+const towers = []; // NEW: track placed towers
+const bullets = [];
+
+canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    towers.push(new Tower(mouseX - 10, mouseY - 10)); // center tower
 });
 
-/* ---------- WAVE SPAWNER ---------- */
-function spawnWave() {
-  wave++;
-  for (let i = 0; i < 6 + wave; i++) {
-    const type = ['enemy_goblin','enemy_orc','enemy_bat','enemy_wolf'][i % 4];
-    enemies.push(new Enemy(type, rand(80, canvas.height - 80)));
-  }
+function update() {
+    enemies.forEach(enemy => enemy.update());
+    towers.forEach(tower => tower.update());
+
+    bullets.forEach((bullet, index) => {
+        const hit = bullet.update();
+        if (hit) bullets.splice(index, 1);
+    });
+
+    // Remove dead enemies
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        if (enemies[i].health <= 0) enemies.splice(i, 1);
+    }
 }
 
-/* ---------- MAIN GAME LOOP ---------- */
+function draw() {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    enemies.forEach(enemy => enemy.draw());
+    towers.forEach(tower => tower.draw());
+    bullets.forEach(bullet => bullet.draw());
+}
+
 function gameLoop() {
-  ctx.fillStyle = '#222'; ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  // UI text
-  ctx.fillStyle = 'white';
-  ctx.font = '16px sans-serif';
-  ctx.fillText(`Money: ${money}`, 10, 20);
-  ctx.fillText(`Wave: ${wave}`,   10, 40);
-  ctx.fillText('Click grid to place tower (50g)', 10, 60);
-
-  // Update & draw entities
-  towers.forEach(t => { t.update(); t.draw(); });
-
-  enemies.forEach(e => e.update());
-  enemies = enemies.filter(e => e.hp > 0 && e.x < canvas.width + 50);
-  enemies.forEach(e => e.draw());
-
-  bullets.forEach(b => b.update());
-  bullets = bullets.filter(b => !b.expire && b.x>-20 && b.x<canvas.width+20 && b.y>-20 && b.y<canvas.height+20);
-  bullets.forEach(b => b.draw());
-
-  requestAnimationFrame(gameLoop);
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
 }
 
-/* ---------- START ---------- */
-function startGame() {
-  spawnWave();
-  // Spawn new waves every 10 s
-  setInterval(spawnWave, 10000);
-  gameLoop();
-}
+gameLoop();
 

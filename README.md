@@ -6,7 +6,8 @@ A full-featured tower defense game with:
 - PWA support for mobile installation
 - Sprite graphics and upgrade system
 
-🕹 [Play the Game](https://yourusername.github.io/tower-defense/)
+🕹 [Play the Game](https://p4nd4907.github.io/tower-defense/)
+
 
 ## How to Run Locally
 Open `index.html` in a browser or run:

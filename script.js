@@ -1,3 +1,4 @@
+// Enhanced Tower Defense Game
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -16,25 +17,26 @@ spriteList.forEach(name => {
   imageAssets[name] = img;
 });
 
-// Game entities
-let enemies = [];
-let towers = [];
-let bullets = [];
+let enemies = [], towers = [], bullets = [], selectedTower = 'tower_arrow';
 
 class Enemy {
-  constructor(x, y, speed, sprite) {
+  constructor(x, y, speed, sprite, hp) {
     this.x = x;
     this.y = y;
     this.speed = speed;
     this.sprite = sprite;
+    this.hp = hp;
+    this.maxHp = hp;
   }
-
   update() {
     this.x += this.speed;
   }
-
   draw() {
     ctx.drawImage(imageAssets[this.sprite], this.x, this.y, 32, 32);
+    ctx.fillStyle = 'red';
+    ctx.fillRect(this.x, this.y - 5, 32, 3);
+    ctx.fillStyle = 'lime';
+    ctx.fillRect(this.x, this.y - 5, 32 * (this.hp / this.maxHp), 3);
   }
 }
 
@@ -47,20 +49,14 @@ class Tower {
     this.fireRate = 60;
     this.cooldown = 0;
   }
-
   update() {
-    if (this.cooldown > 0) {
-      this.cooldown--;
-      return;
-    }
-
+    if (this.cooldown > 0) return this.cooldown--;
     let target = enemies.find(e => Math.abs(e.x - this.x) < 100 && Math.abs(e.y - this.y) < 100);
     if (target) {
       bullets.push(new Bullet(this.x + 16, this.y + 16, target, this.bulletType));
       this.cooldown = this.fireRate;
     }
   }
-
   draw() {
     ctx.drawImage(imageAssets[this.sprite], this.x, this.y, 32, 32);
   }
@@ -73,8 +69,8 @@ class Bullet {
     this.target = target;
     this.sprite = sprite;
     this.speed = 4;
+    this.damage = 10;
   }
-
   update() {
     let dx = this.target.x - this.x;
     let dy = this.target.y - this.y;
@@ -83,42 +79,52 @@ class Bullet {
       this.x += (dx / dist) * this.speed;
       this.y += (dy / dist) * this.speed;
     }
+    if (dist < 10) {
+      this.target.hp -= this.damage;
+      bullets.splice(bullets.indexOf(this), 1);
+    }
   }
-
   draw() {
     ctx.drawImage(imageAssets[this.sprite], this.x, this.y, 16, 16);
   }
 }
 
-// Initial setup
-function initGame() {
-  towers.push(new Tower(150, 150, 'tower_arrow', 'bullet_default'));
-  enemies.push(new Enemy(0, 100, 1, 'enemy_goblin'));
-  enemies.push(new Enemy(-100, 200, 1.2, 'enemy_orc'));
-  enemies.push(new Enemy(-200, 300, 0.8, 'enemy_bat'));
+function spawnWave() {
+  for (let i = 0; i < 5; i++) {
+    let type = ['enemy_goblin', 'enemy_orc', 'enemy_bat'][Math.floor(Math.random() * 3)];
+    enemies.push(new Enemy(-50 * i, 100 + Math.random() * 200, 1 + Math.random(), type, 30));
+  }
+}
 
+function drawUI() {
+  ctx.fillStyle = 'white';
+  ctx.font = '16px Arial';
+  ctx.fillText(`Click to place tower: ${selectedTower}`, 10, 20);
+}
+
+canvas.addEventListener('click', e => {
+  let rect = canvas.getBoundingClientRect();
+  let x = e.clientX - rect.left;
+  let y = e.clientY - rect.top;
+  towers.push(new Tower(x - 16, y - 16, selectedTower, 'bullet_default'));
+});
+
+function initGame() {
+  spawnWave();
   requestAnimationFrame(gameLoop);
 }
 
 function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawUI();
 
-  towers.forEach(t => {
-    t.update();
-    t.draw();
-  });
-
-  enemies.forEach(e => {
-    e.update();
-    e.draw();
-  });
-
-  bullets.forEach(b => {
-    b.update();
-    b.draw();
-  });
+  towers.forEach(t => { t.update(); t.draw(); });
+  enemies = enemies.filter(e => e.hp > 0);
+  enemies.forEach(e => { e.update(); e.draw(); });
+  bullets.forEach(b => { b.update(); b.draw(); });
 
   requestAnimationFrame(gameLoop);
 }
 
 initGame();
+
